@@ -1,0 +1,680 @@
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>FIRE Finance Cockpit</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page-plane: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --border: rgba(11, 11, 11, 0.10);
+    --good: #0ca30c;
+    --good-text: #006300;
+    --warning: #fab219;
+    --warning-bg: #fff6e2;
+    --good-bg: #eaf7ea;
+    --accent: #2a78d6;
+    --danger: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page-plane: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --good: #0ca30c;
+      --good-text: #0ca30c;
+      --warning: #fab219;
+      --warning-bg: #2a2410;
+      --good-bg: #14261a;
+      --accent: #3987e5;
+      --danger: #e66767;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--page-plane);
+  }
+
+  /* ---------- Header ---------- */
+  .app-header {
+    display: flex;
+    gap: 10px;
+    padding: 16px 16px 8px;
+  }
+
+  .stat-tile {
+    flex: 1;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-tile .label {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-tile .value {
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bonsai-tile.status-good .value { color: var(--good-text); }
+  .bonsai-tile.status-warning .value { color: var(--warning); }
+  .bonsai-tile .sub-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* ---------- Dashboard ---------- */
+  .dashboard {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 16px 140px;
+  }
+
+  .kpi-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .kpi-row .stat-tile .value { font-size: 18px; }
+
+  .activity-section .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 4px 0 8px;
+  }
+
+  .activity-empty {
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 24px 0;
+    text-align: center;
+  }
+
+  .activity-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+
+  .activity-item .icon { font-size: 20px; }
+  .activity-item .details { flex: 1; min-width: 0; }
+  .activity-item .desc {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .activity-item .cat {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .activity-item .amount {
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ---------- Confirmation panel ---------- */
+  .confirm-panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .confirm-panel h2 {
+    font-size: 15px;
+    margin: 0 0 12px;
+  }
+
+  .confirm-row {
+    display: grid;
+    grid-template-columns: 90px 1fr auto;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+
+  .confirm-row input[type="text"],
+  .confirm-row input[type="number"],
+  .confirm-row select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+  }
+
+  .confirm-row .desc-cell { grid-column: 1 / span 2; }
+  .confirm-row .cat-cell { grid-column: 1 / span 2; }
+
+  .confirm-row .remove-btn {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+
+  .confirm-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .btn-primary { background: var(--good); color: #fff; flex: 1; }
+  .btn-secondary { background: var(--border); color: var(--text-primary); }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 96px;
+    transform: translate(-50%, 12px);
+    max-width: 90%;
+    background: var(--text-primary);
+    color: var(--surface-1);
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 20;
+  }
+  .toast.visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  .toast.toast-error { background: var(--danger); }
+
+  /* ---------- Input bar ---------- */
+  .input-bar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--surface-1);
+    border-top: 1px solid var(--border);
+  }
+
+  .icon-btn {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--page-plane);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .text-input {
+    flex: 1;
+    height: 44px;
+    border-radius: 22px;
+    border: 1px solid var(--border);
+    background: var(--page-plane);
+    color: var(--text-primary);
+    padding: 0 16px;
+    font-size: 15px;
+    font-family: inherit;
+  }
+
+  .send-btn {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .send-btn:disabled, .icon-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .loading-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .loading-bar.visible { display: flex; }
+
+  .dot-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1s infinite ease-in-out;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.1); }
+  }
+
+  #camera-input { display: none; }
+</style>
+
+<div id="app">
+  <header class="app-header">
+    <div class="stat-tile streak-tile">
+      <span class="label">Streak</span>
+      <span class="value">🔥 <span id="streak-value">0</span> ngày</span>
+    </div>
+    <div class="stat-tile bonsai-tile status-good" id="bonsai-tile">
+      <span class="label">Bonsai</span>
+      <span class="value"><span id="bonsai-emoji">🌳</span> <span id="bonsai-label">Khỏe mạnh</span></span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <div class="kpi-row">
+      <div class="stat-tile">
+        <span class="label">Hôm nay đã chi</span>
+        <span class="value" id="today-total">0₫</span>
+      </div>
+      <div class="stat-tile">
+        <span class="label">Giao dịch</span>
+        <span class="value" id="today-count">0</span>
+      </div>
+    </div>
+
+    <div class="confirm-panel" id="confirm-panel" style="display:none;">
+      <h2>Xác nhận giao dịch</h2>
+      <div id="confirm-rows"></div>
+      <div class="confirm-actions">
+        <button class="btn btn-secondary" id="cancel-btn">Hủy</button>
+        <button class="btn btn-primary" id="save-btn">Lưu</button>
+      </div>
+    </div>
+
+    <div class="loading-bar" id="loading-bar">
+      <span class="dot-pulse"></span>
+      <span id="loading-text">AI đang bóc tách...</span>
+    </div>
+
+    <div class="activity-section">
+      <div class="section-title">Giao dịch hôm nay</div>
+      <div id="activity-empty" class="activity-empty">Chưa có giao dịch nào hôm nay 🌱</div>
+      <div id="activity-list"></div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <footer class="input-bar">
+    <button class="icon-btn" id="camera-btn" title="Chụp hóa đơn">📷</button>
+    <input type="file" id="camera-input" accept="image/*" capture="environment" />
+    <input type="text" class="text-input" id="text-input" placeholder="Sáng đổ xăng 50k..." />
+    <button class="send-btn" id="send-btn" title="Gửi">➤</button>
+  </footer>
+</div>
+
+<script>
+  const API_BASE = "http://localhost:8000";
+  const USER_ID = 1;
+  // Placeholder until a GET /api/users/{id} endpoint exposes the real monthly_budget.
+  const DAILY_SOFT_LIMIT = 300000;
+
+  const CATEGORIES = [
+    { value: "Ăn uống", icon: "🍜" },
+    { value: "Di chuyển", icon: "🚗" },
+    { value: "Hóa đơn", icon: "🧾" },
+    { value: "Mua sắm", icon: "🛍️" },
+    { value: "Sức khỏe", icon: "💊" },
+    { value: "Gia đình", icon: "👨‍👩‍👧" },
+    { value: "Giao tiếp", icon: "📱" },
+    { value: "Khác", icon: "📦" },
+  ];
+
+  const state = {
+    streak: 0,
+    todayTotal: 0,
+    todayCount: 0,
+    pending: [],
+  };
+
+  const el = {
+    streakValue: document.getElementById("streak-value"),
+    bonsaiTile: document.getElementById("bonsai-tile"),
+    bonsaiEmoji: document.getElementById("bonsai-emoji"),
+    bonsaiLabel: document.getElementById("bonsai-label"),
+    todayTotal: document.getElementById("today-total"),
+    todayCount: document.getElementById("today-count"),
+    confirmPanel: document.getElementById("confirm-panel"),
+    confirmRows: document.getElementById("confirm-rows"),
+    cancelBtn: document.getElementById("cancel-btn"),
+    saveBtn: document.getElementById("save-btn"),
+    loadingBar: document.getElementById("loading-bar"),
+    loadingText: document.getElementById("loading-text"),
+    activityEmpty: document.getElementById("activity-empty"),
+    activityList: document.getElementById("activity-list"),
+    toast: document.getElementById("toast"),
+    cameraBtn: document.getElementById("camera-btn"),
+    cameraInput: document.getElementById("camera-input"),
+    textInput: document.getElementById("text-input"),
+    sendBtn: document.getElementById("send-btn"),
+  };
+
+  const currencyFormatter = new Intl.NumberFormat("vi-VN");
+  function formatVND(amount) {
+    return currencyFormatter.format(amount) + "₫";
+  }
+
+  function categoryIcon(value) {
+    const found = CATEGORIES.find((c) => c.value === value);
+    return found ? found.icon : "📦";
+  }
+
+  // ---------- Audio + haptics ----------
+  let audioCtx = null;
+  function getAudioContext() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  function playTingSound() {
+    try {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+      const duration = 1.6;
+
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.35, now + 0.02);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      master.connect(ctx.destination);
+
+      [528, 1056, 1584].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(1 / (i + 1), now);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(now);
+        osc.stop(now + duration);
+      });
+    } catch (err) {
+      console.warn("Audio playback unavailable:", err);
+    }
+  }
+
+  function triggerHaptics() {
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 100, 50]);
+    }
+  }
+
+  // ---------- UI helpers ----------
+  let toastTimer = null;
+  function showToast(message, type) {
+    el.toast.textContent = message;
+    el.toast.className = "toast visible" + (type === "error" ? " toast-error" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.toast.className = "toast";
+    }, 2800);
+  }
+
+  function setLoading(isLoading, message) {
+    el.loadingBar.classList.toggle("visible", isLoading);
+    if (message) el.loadingText.textContent = message;
+    el.sendBtn.disabled = isLoading;
+    el.cameraBtn.disabled = isLoading;
+  }
+
+  function updateBonsaiStatus() {
+    const isWarning = state.todayTotal >= DAILY_SOFT_LIMIT;
+    el.bonsaiTile.classList.toggle("status-good", !isWarning);
+    el.bonsaiTile.classList.toggle("status-warning", isWarning);
+    el.bonsaiEmoji.textContent = isWarning ? "🍂" : "🌳";
+    el.bonsaiLabel.textContent = isWarning ? "Cần chú ý" : "Khỏe mạnh";
+  }
+
+  function updateDashboard() {
+    el.streakValue.textContent = state.streak;
+    el.todayTotal.textContent = formatVND(state.todayTotal);
+    el.todayCount.textContent = state.todayCount;
+    updateBonsaiStatus();
+  }
+
+  function addActivityItem(txn) {
+    el.activityEmpty.style.display = "none";
+    const item = document.createElement("div");
+    item.className = "activity-item";
+    item.innerHTML = `
+      <span class="icon">${categoryIcon(txn.category)}</span>
+      <span class="details">
+        <div class="desc">${escapeHtml(txn.description || txn.category)}</div>
+        <div class="cat">${escapeHtml(txn.category)}</div>
+      </span>
+      <span class="amount">-${formatVND(txn.amount)}</span>
+    `;
+    el.activityList.prepend(item);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---------- Confirmation panel ----------
+  function renderConfirmation(items) {
+    state.pending = items;
+    el.confirmRows.innerHTML = "";
+    items.forEach((item, index) => {
+      const row = document.createElement("div");
+      row.className = "confirm-row";
+      row.dataset.index = index;
+      row.innerHTML = `
+        <input type="number" class="amount-input" value="${item.amount}" min="1" step="1000" />
+        <input type="text" class="desc-input desc-cell" value="${escapeHtml(item.description || "")}" placeholder="Mô tả" />
+        <button class="remove-btn" title="Xóa">✕</button>
+        <select class="cat-input cat-cell">
+          ${CATEGORIES.map(
+            (c) => `<option value="${c.value}" ${c.value === item.category ? "selected" : ""}>${c.icon} ${c.value}</option>`
+          ).join("")}
+        </select>
+      `;
+      row.querySelector(".remove-btn").addEventListener("click", () => {
+        row.remove();
+        if (el.confirmRows.children.length === 0) hideConfirmation();
+      });
+      el.confirmRows.appendChild(row);
+    });
+    el.confirmPanel.style.display = "block";
+  }
+
+  function hideConfirmation() {
+    el.confirmPanel.style.display = "none";
+    el.confirmRows.innerHTML = "";
+    state.pending = [];
+  }
+
+  function collectConfirmedTransactions() {
+    return Array.from(el.confirmRows.querySelectorAll(".confirm-row")).map((row) => ({
+      type: "expense",
+      amount: parseInt(row.querySelector(".amount-input").value, 10),
+      category: row.querySelector(".cat-input").value,
+      description: row.querySelector(".desc-input").value,
+      is_ai_parsed: true,
+    }));
+  }
+
+  // ---------- API calls ----------
+  async function callParse(payload) {
+    setLoading(true, "AI đang bóc tách...");
+    try {
+      const res = await fetch(`${API_BASE}/api/parse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Không thể phân tích giao dịch");
+      }
+      if (!data.transactions || data.transactions.length === 0) {
+        showToast("Không tìm thấy giao dịch nào", "error");
+        return;
+      }
+      renderConfirmation(data.transactions);
+    } catch (err) {
+      showToast(err.message || "Lỗi kết nối tới máy chủ", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveTransactions() {
+    const transactions = collectConfirmedTransactions();
+    if (transactions.length === 0) return;
+    for (const txn of transactions) {
+      if (!txn.amount || txn.amount <= 0) {
+        showToast("Số tiền phải lớn hơn 0", "error");
+        return;
+      }
+    }
+
+    el.saveBtn.disabled = true;
+    try {
+      const res = await fetch(`${API_BASE}/api/transactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: USER_ID, transactions }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Không thể lưu giao dịch");
+      }
+
+      playTingSound();
+      triggerHaptics();
+
+      state.streak = data.current_streak;
+      transactions.forEach((txn) => {
+        state.todayTotal += txn.amount;
+        state.todayCount += 1;
+        addActivityItem(txn);
+      });
+      updateDashboard();
+
+      hideConfirmation();
+      el.textInput.value = "";
+      showToast("Đã lưu giao dịch!");
+    } catch (err) {
+      showToast(err.message || "Lỗi kết nối tới máy chủ", "error");
+    } finally {
+      el.saveBtn.disabled = false;
+    }
+  }
+
+  // ---------- Events ----------
+  function handleSend() {
+    const text = el.textInput.value.trim();
+    if (!text) return;
+    callParse({ text });
+  }
+
+  el.sendBtn.addEventListener("click", handleSend);
+  el.textInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleSend();
+  });
+  el.cancelBtn.addEventListener("click", hideConfirmation);
+  el.saveBtn.addEventListener("click", saveTransactions);
+
+  el.cameraBtn.addEventListener("click", () => el.cameraInput.click());
+  el.cameraInput.addEventListener("change", () => {
+    const file = el.cameraInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(",")[1];
+      callParse({ image_base64: base64 });
+    };
+    reader.readAsDataURL(file);
+    el.cameraInput.value = "";
+  });
+
+  updateDashboard();
+</script>
