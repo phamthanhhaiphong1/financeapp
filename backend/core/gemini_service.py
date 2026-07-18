@@ -7,10 +7,9 @@ from google import genai
 from google.genai import types
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ROOT_DIR = os.path.dirname(os.path.dirname(APP_DIR))
 
 ENV_PATH = os.path.join(APP_DIR, ".env")
-PROMPT_PATH = os.path.join(ROOT_DIR, "prompts", "fire_expense_parser_v2.md")
+PROMPT_PATH = os.path.join(APP_DIR, "prompts", "fire_expense_parser_v2.md")
 
 MODEL_NAME = "gemini-3.5-flash"
 
