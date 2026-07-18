@@ -66,7 +66,7 @@ class MonthlySummaryResponse(BaseModel):
     balance: int
 
 
-class TodayTransactionItem(BaseModel):
+class TransactionItem(BaseModel):
     id: int
     type: TransactionType
     amount: int
@@ -74,8 +74,17 @@ class TodayTransactionItem(BaseModel):
     description: Optional[str] = None
 
 
-class TodayTransactionsResponse(BaseModel):
-    transactions: List[TodayTransactionItem]
+class TransactionListResponse(BaseModel):
+    transactions: List[TransactionItem]
+
+
+class MonthOption(BaseModel):
+    year: int
+    month: int
+
+
+class AvailableMonthsResponse(BaseModel):
+    months: List[MonthOption]
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -153,10 +162,12 @@ def create_transactions(payload: SaveTransactionsRequest):
 
 
 @router.get("/summary/monthly", response_model=MonthlySummaryResponse)
-def get_monthly_summary(user_id: int):
+def get_monthly_summary(user_id: int, year: Optional[int] = None, month: Optional[int] = None):
     db = SessionLocal()
     try:
         today = date.today()
+        target_year = year or today.year
+        target_month = month or today.month
 
         def sum_for(txn_type: TransactionType) -> int:
             return (
@@ -164,8 +175,8 @@ def get_monthly_summary(user_id: int):
                 .filter(
                     Transaction.user_id == user_id,
                     Transaction.type == txn_type,
-                    extract("year", Transaction.created_at) == today.year,
-                    extract("month", Transaction.created_at) == today.month,
+                    extract("year", Transaction.created_at) == target_year,
+                    extract("month", Transaction.created_at) == target_month,
                 )
                 .scalar()
             )
@@ -182,20 +193,27 @@ def get_monthly_summary(user_id: int):
         db.close()
 
 
-@router.get("/transactions/today", response_model=TodayTransactionsResponse)
-def get_today_transactions(user_id: int):
+@router.get("/transactions/monthly", response_model=TransactionListResponse)
+def get_monthly_transactions(user_id: int, year: Optional[int] = None, month: Optional[int] = None):
     db = SessionLocal()
     try:
         today = date.today()
+        target_year = year or today.year
+        target_month = month or today.month
+
         rows = (
             db.query(Transaction)
-            .filter(Transaction.user_id == user_id, func.date(Transaction.created_at) == today)
+            .filter(
+                Transaction.user_id == user_id,
+                extract("year", Transaction.created_at) == target_year,
+                extract("month", Transaction.created_at) == target_month,
+            )
             .order_by(Transaction.created_at.desc())
             .all()
         )
-        return TodayTransactionsResponse(
+        return TransactionListResponse(
             transactions=[
-                TodayTransactionItem(
+                TransactionItem(
                     id=t.id,
                     type=t.type,
                     amount=t.amount,
@@ -205,5 +223,28 @@ def get_today_transactions(user_id: int):
                 for t in rows
             ]
         )
+    finally:
+        db.close()
+
+
+@router.get("/transactions/months", response_model=AvailableMonthsResponse)
+def get_available_months(user_id: int):
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(
+                extract("year", Transaction.created_at),
+                extract("month", Transaction.created_at),
+            )
+            .filter(Transaction.user_id == user_id)
+            .distinct()
+            .all()
+        )
+        months = sorted(
+            (MonthOption(year=int(y), month=int(m)) for y, m in rows),
+            key=lambda opt: (opt.year, opt.month),
+            reverse=True,
+        )
+        return AvailableMonthsResponse(months=months)
     finally:
         db.close()

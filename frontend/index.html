@@ -116,6 +116,35 @@
 
   .kpi-row .stat-tile .value { font-size: 18px; }
 
+  .month-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+    scrollbar-width: none;
+  }
+  .month-tabs::-webkit-scrollbar { display: none; }
+
+  .month-tab {
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: var(--surface-1);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .month-tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
   .kpi-row-3 { gap: 8px; }
   .kpi-row-3 .stat-tile { padding: 10px 8px; align-items: flex-start; }
   .kpi-row-3 .stat-tile .label { font-size: 11px; }
@@ -340,6 +369,35 @@
 
   .send-btn:disabled, .icon-btn:disabled { opacity: 0.5; cursor: default; }
 
+  .input-bar.hidden { display: none; }
+
+  .history-bar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--surface-1);
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .history-bar.hidden { display: none; }
+  .history-bar button {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 999px;
+    padding: 8px 14px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
   .loading-bar {
     display: none;
     align-items: center;
@@ -452,6 +510,8 @@
   </header>
 
   <main class="dashboard">
+    <div class="month-tabs" id="month-tabs"></div>
+
     <div class="kpi-row kpi-row-3">
       <div class="stat-tile">
         <span class="label">Thu nhập</span>
@@ -482,20 +542,25 @@
     </div>
 
     <div class="activity-section">
-      <div class="section-title">Giao dịch hôm nay</div>
-      <div id="activity-empty" class="activity-empty">Chưa có giao dịch nào hôm nay 🌱</div>
+      <div class="section-title" id="activity-section-title">Giao dịch tháng này</div>
+      <div id="activity-empty" class="activity-empty">Chưa có giao dịch nào 🌱</div>
       <div id="activity-list"></div>
     </div>
   </main>
 
   <div class="toast" id="toast"></div>
 
-  <footer class="input-bar">
+  <footer class="input-bar" id="input-bar">
     <button class="icon-btn" id="camera-btn" title="Chụp hóa đơn">📷</button>
     <input type="file" id="camera-input" accept="image/*" capture="environment" />
     <input type="text" class="text-input" id="text-input" placeholder="Sáng đổ xăng 50k..." />
     <button class="send-btn" id="send-btn" title="Gửi">➤</button>
   </footer>
+
+  <div class="history-bar hidden" id="history-bar">
+    <span>Đang xem tháng trước — không thể thêm giao dịch mới ở đây.</span>
+    <button type="button" id="back-to-current-btn">Về tháng này</button>
+  </div>
 </div>
 
 <div class="onboarding-overlay hidden" id="onboarding-overlay">
@@ -533,11 +598,18 @@
     { value: "Khác", icon: "📦" },
   ];
 
+  const todayDate = new Date();
+  const CURRENT_YEAR = todayDate.getFullYear();
+  const CURRENT_MONTH = todayDate.getMonth() + 1;
+
   const state = {
     streak: 0,
     monthlyIncome: 0,
     monthlyExpense: 0,
     pending: [],
+    selectedYear: CURRENT_YEAR,
+    selectedMonth: CURRENT_MONTH,
+    months: [],
   };
 
   const el = {
@@ -561,6 +633,11 @@
     cameraInput: document.getElementById("camera-input"),
     textInput: document.getElementById("text-input"),
     sendBtn: document.getElementById("send-btn"),
+    monthTabs: document.getElementById("month-tabs"),
+    activitySectionTitle: document.getElementById("activity-section-title"),
+    inputBar: document.getElementById("input-bar"),
+    historyBar: document.getElementById("history-bar"),
+    backToCurrentBtn: document.getElementById("back-to-current-btn"),
     userBarName: document.getElementById("user-bar-name"),
     switchUserBtn: document.getElementById("switch-user-btn"),
     onboardingOverlay: document.getElementById("onboarding-overlay"),
@@ -671,29 +748,96 @@
     updateBonsaiStatus();
   }
 
-  async function fetchMonthlySummary() {
+  // ---------- Month selection ----------
+  function isViewingCurrentMonth() {
+    return state.selectedYear === CURRENT_YEAR && state.selectedMonth === CURRENT_MONTH;
+  }
+
+  function monthLabel(year, month) {
+    return `T${month}/${year}`;
+  }
+
+  function renderMonthTabs() {
+    el.monthTabs.innerHTML = "";
+    state.months.forEach(({ year, month }) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const isActive = year === state.selectedYear && month === state.selectedMonth;
+      btn.className = "month-tab" + (isActive ? " active" : "");
+      btn.textContent = monthLabel(year, month);
+      btn.addEventListener("click", () => selectMonth(year, month));
+      el.monthTabs.appendChild(btn);
+    });
+  }
+
+  function updateInputAvailability() {
+    const isCurrent = isViewingCurrentMonth();
+    el.inputBar.classList.toggle("hidden", !isCurrent);
+    el.historyBar.classList.toggle("hidden", isCurrent);
+  }
+
+  async function loadMonthsList() {
+    let months = [];
     try {
-      const res = await fetch(`${API_BASE}/api/summary/monthly?user_id=${USER_ID}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      state.monthlyIncome = data.total_income;
-      state.monthlyExpense = data.total_expense;
-      updateDashboard();
+      const res = await fetch(`${API_BASE}/api/transactions/months?user_id=${USER_ID}`);
+      if (res.ok) {
+        const data = await res.json();
+        months = data.months || [];
+      }
+    } catch (err) {
+      console.warn("Failed to load months list:", err);
+    }
+    const hasCurrent = months.some((m) => m.year === CURRENT_YEAR && m.month === CURRENT_MONTH);
+    if (!hasCurrent) {
+      months.push({ year: CURRENT_YEAR, month: CURRENT_MONTH });
+    }
+    months.sort((a, b) => b.year - a.year || b.month - a.month);
+    state.months = months;
+    renderMonthTabs();
+  }
+
+  async function loadMonthData() {
+    el.activitySectionTitle.textContent = isViewingCurrentMonth()
+      ? "Giao dịch tháng này"
+      : `Giao dịch ${monthLabel(state.selectedYear, state.selectedMonth)}`;
+    updateInputAvailability();
+
+    el.activityList.innerHTML = "";
+    el.activityEmpty.style.display = "block";
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/summary/monthly?user_id=${USER_ID}&year=${state.selectedYear}&month=${state.selectedMonth}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        state.monthlyIncome = data.total_income;
+        state.monthlyExpense = data.total_expense;
+        updateDashboard();
+      }
     } catch (err) {
       console.warn("Failed to load monthly summary:", err);
     }
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/transactions/monthly?user_id=${USER_ID}&year=${state.selectedYear}&month=${state.selectedMonth}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const items = (data.transactions || []).slice().reverse();
+        items.forEach((txn) => addActivityItem(txn));
+      }
+    } catch (err) {
+      console.warn("Failed to load month's transactions:", err);
+    }
   }
 
-  async function fetchTodayTransactions() {
-    try {
-      const res = await fetch(`${API_BASE}/api/transactions/today?user_id=${USER_ID}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      const items = (data.transactions || []).slice().reverse();
-      items.forEach((txn) => addActivityItem(txn));
-    } catch (err) {
-      console.warn("Failed to load today's transactions:", err);
-    }
+  function selectMonth(year, month) {
+    state.selectedYear = year;
+    state.selectedMonth = month;
+    renderMonthTabs();
+    loadMonthData();
   }
 
   function addActivityItem(txn) {
@@ -859,12 +1003,12 @@
     el.userBarName.textContent = `👋 ${USER_NAME}`;
   }
 
-  function initApp() {
+  async function initApp() {
     hideOnboarding();
     updateUserBar();
     updateDashboard();
-    fetchMonthlySummary();
-    fetchTodayTransactions();
+    await loadMonthsList();
+    await loadMonthData();
   }
 
   async function identifyUser(name, pin) {
@@ -919,6 +1063,8 @@
     localStorage.removeItem(USER_NAME_KEY);
     location.reload();
   });
+
+  el.backToCurrentBtn.addEventListener("click", () => selectMonth(CURRENT_YEAR, CURRENT_MONTH));
 
   // ---------- Events ----------
   function handleSend() {
