@@ -16,9 +16,21 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_PATH = os.path.join(BASE_DIR, "database", "data.sqlite")
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+# Vercel's serverless filesystem is read-only outside /tmp, so a local
+# SQLite file can't be written to in production. Vercel Postgres (Neon)
+# injects DATABASE_URL/POSTGRES_URL when connected; fall back to a local
+# SQLite file for local dev where no such variable is set.
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
+
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    DB_PATH = os.path.join(BASE_DIR, "database", "data.sqlite")
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
@@ -86,3 +98,13 @@ class GamificationLog(Base):
     achieved_date = Column(Date, nullable=False)
 
     user = relationship("User", back_populates="gamification_logs")
+
+
+Base.metadata.create_all(bind=engine)
+
+# The frontend hard-codes USER_ID = 1 (no auth/onboarding flow yet), so make
+# sure that row exists on a fresh database instead of every save 404ing.
+with SessionLocal() as _db:
+    if _db.get(User, 1) is None:
+        _db.add(User(id=1, email="demo@fire-finance.local", monthly_budget=0, fire_target=0))
+        _db.commit()
