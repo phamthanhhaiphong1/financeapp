@@ -123,6 +123,17 @@ def _ensure_column(table_name: str, column_name: str, ddl_type: str) -> None:
     inspector = inspect(engine)
     if not inspector.has_table(table_name):
         return
+
+    if engine.dialect.name == "postgresql":
+        # ADD COLUMN IF NOT EXISTS is atomic on Postgres, so concurrent cold
+        # starts racing to run this at import time can't collide the way a
+        # separate check-then-add would.
+        with engine.begin() as conn:
+            conn.execute(
+                text(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {ddl_type}")
+            )
+        return
+
     existing_columns = {col["name"] for col in inspector.get_columns(table_name)}
     if column_name in existing_columns:
         return

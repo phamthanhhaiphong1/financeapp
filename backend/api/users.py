@@ -47,26 +47,32 @@ class IdentifyUserResponse(BaseModel):
 def identify_user(payload: IdentifyUserRequest):
     db = SessionLocal()
     try:
-        existing = db.query(User).filter(func.lower(User.name) == payload.name.lower()).first()
+        try:
+            existing = db.query(User).filter(func.lower(User.name) == payload.name.lower()).first()
 
-        if existing:
-            expected_hash = _hash_pin(payload.pin, existing.pin_salt or "")
-            if not existing.pin_hash or expected_hash != existing.pin_hash:
-                raise HTTPException(status_code=401, detail="Sai mã PIN cho tên này")
-            return IdentifyUserResponse(user_id=existing.id, name=existing.name, created=False)
+            if existing:
+                expected_hash = _hash_pin(payload.pin, existing.pin_salt or "")
+                if not existing.pin_hash or expected_hash != existing.pin_hash:
+                    raise HTTPException(status_code=401, detail="Sai mã PIN cho tên này")
+                return IdentifyUserResponse(user_id=existing.id, name=existing.name, created=False)
 
-        salt = secrets.token_hex(16)
-        new_user = User(
-            name=payload.name,
-            pin_salt=salt,
-            pin_hash=_hash_pin(payload.pin, salt),
-            email=f"user-{secrets.token_hex(8)}@fire-finance.local",
-            monthly_budget=0,
-            fire_target=0,
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        return IdentifyUserResponse(user_id=new_user.id, name=new_user.name, created=True)
+            salt = secrets.token_hex(16)
+            new_user = User(
+                name=payload.name,
+                pin_salt=salt,
+                pin_hash=_hash_pin(payload.pin, salt),
+                email=f"user-{secrets.token_hex(8)}@fire-finance.local",
+                monthly_budget=0,
+                fire_target=0,
+            )
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            return IdentifyUserResponse(user_id=new_user.id, name=new_user.name, created=True)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Lỗi máy chủ khi xác thực: {exc}")
     finally:
         db.close()
