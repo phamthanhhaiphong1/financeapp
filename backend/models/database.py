@@ -51,6 +51,7 @@ class TransactionCategory(str, enum.Enum):
     SUC_KHOE = "Sức khỏe"
     GIA_DINH = "Gia đình"
     GIAO_TIEP = "Giao tiếp"
+    THU_NHAP = "Thu nhập"
     KHAC = "Khác"
 
 
@@ -81,7 +82,10 @@ class Transaction(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     type = Column(SqlEnum(TransactionType), nullable=False)
     amount = Column(Integer, nullable=False)
-    category = Column(SqlEnum(TransactionCategory), nullable=False)
+    # native_enum=False: plain VARCHAR validated by Pydantic, not a Postgres
+    # ENUM type. The category list evolves (e.g. "Thu nhập" added later) and
+    # a native PG enum can't gain new values through create_all() alone.
+    category = Column(SqlEnum(TransactionCategory, native_enum=False, length=50), nullable=False)
     description = Column(Text)
     is_ai_parsed = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

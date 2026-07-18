@@ -17,6 +17,7 @@
     --good-bg: #eaf7ea;
     --accent: #2a78d6;
     --danger: #d03b3b;
+    --danger-bg: #fbe9e9;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -34,6 +35,7 @@
       --good-bg: #14261a;
       --accent: #3987e5;
       --danger: #e66767;
+      --danger-bg: #2a1414;
     }
   }
 
@@ -114,6 +116,16 @@
 
   .kpi-row .stat-tile .value { font-size: 18px; }
 
+  .kpi-row-3 { gap: 8px; }
+  .kpi-row-3 .stat-tile { padding: 10px 8px; align-items: flex-start; }
+  .kpi-row-3 .stat-tile .label { font-size: 11px; }
+  .kpi-row-3 .stat-tile .value { font-size: 14px; }
+
+  #monthly-income { color: var(--good-text); }
+  #monthly-expense { color: var(--danger); }
+  #monthly-balance.balance-positive { color: var(--good-text); }
+  #monthly-balance.balance-negative { color: var(--danger); }
+
   .activity-section .section-title {
     font-size: 13px;
     font-weight: 600;
@@ -157,6 +169,8 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
+  .activity-item .amount.amount-income { color: var(--good-text); }
+  .activity-item .amount.amount-expense { color: var(--danger); }
 
   /* ---------- Confirmation panel ---------- */
   .confirm-panel {
@@ -173,12 +187,25 @@
   }
 
   .confirm-row {
-    display: grid;
-    grid-template-columns: 90px 1fr auto;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .confirm-row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .confirm-row-top {
+    display: flex;
+    gap: 8px;
     align-items: center;
   }
+  .confirm-row-top .amount-input { flex: 1; min-width: 0; }
 
   .confirm-row input[type="text"],
   .confirm-row input[type="number"],
@@ -193,10 +220,21 @@
     font-family: inherit;
   }
 
-  .confirm-row .desc-cell { grid-column: 1 / span 2; }
-  .confirm-row .cat-cell { grid-column: 1 / span 2; }
+  .type-badge {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .type-badge.type-income { background: var(--good-bg); color: var(--good-text); }
+  .type-badge.type-expense { background: var(--danger-bg); color: var(--danger); }
 
   .confirm-row .remove-btn {
+    flex-shrink: 0;
     background: none;
     border: none;
     color: var(--danger);
@@ -340,14 +378,18 @@
   </header>
 
   <main class="dashboard">
-    <div class="kpi-row">
+    <div class="kpi-row kpi-row-3">
       <div class="stat-tile">
-        <span class="label">Hôm nay đã chi</span>
-        <span class="value" id="today-total">0₫</span>
+        <span class="label">Thu nhập</span>
+        <span class="value" id="monthly-income">0₫</span>
       </div>
       <div class="stat-tile">
-        <span class="label">Giao dịch</span>
-        <span class="value" id="today-count">0</span>
+        <span class="label">Chi tiêu</span>
+        <span class="value" id="monthly-expense">0₫</span>
+      </div>
+      <div class="stat-tile">
+        <span class="label">Số dư</span>
+        <span class="value" id="monthly-balance">0₫</span>
       </div>
     </div>
 
@@ -398,13 +440,15 @@
     { value: "Sức khỏe", icon: "💊" },
     { value: "Gia đình", icon: "👨‍👩‍👧" },
     { value: "Giao tiếp", icon: "📱" },
+    { value: "Thu nhập", icon: "💰" },
     { value: "Khác", icon: "📦" },
   ];
 
   const state = {
     streak: 0,
-    todayTotal: 0,
-    todayCount: 0,
+    todayExpense: 0,
+    monthlyIncome: 0,
+    monthlyExpense: 0,
     pending: [],
   };
 
@@ -413,8 +457,9 @@
     bonsaiTile: document.getElementById("bonsai-tile"),
     bonsaiEmoji: document.getElementById("bonsai-emoji"),
     bonsaiLabel: document.getElementById("bonsai-label"),
-    todayTotal: document.getElementById("today-total"),
-    todayCount: document.getElementById("today-count"),
+    monthlyIncome: document.getElementById("monthly-income"),
+    monthlyExpense: document.getElementById("monthly-expense"),
+    monthlyBalance: document.getElementById("monthly-balance"),
     confirmPanel: document.getElementById("confirm-panel"),
     confirmRows: document.getElementById("confirm-rows"),
     cancelBtn: document.getElementById("cancel-btn"),
@@ -505,7 +550,7 @@
   }
 
   function updateBonsaiStatus() {
-    const isWarning = state.todayTotal >= DAILY_SOFT_LIMIT;
+    const isWarning = state.todayExpense >= DAILY_SOFT_LIMIT;
     el.bonsaiTile.classList.toggle("status-good", !isWarning);
     el.bonsaiTile.classList.toggle("status-warning", isWarning);
     el.bonsaiEmoji.textContent = isWarning ? "🍂" : "🌳";
@@ -514,13 +559,33 @@
 
   function updateDashboard() {
     el.streakValue.textContent = state.streak;
-    el.todayTotal.textContent = formatVND(state.todayTotal);
-    el.todayCount.textContent = state.todayCount;
+    el.monthlyIncome.textContent = "+" + formatVND(state.monthlyIncome);
+    el.monthlyExpense.textContent = "-" + formatVND(state.monthlyExpense);
+
+    const balance = state.monthlyIncome - state.monthlyExpense;
+    el.monthlyBalance.textContent = (balance < 0 ? "-" : "") + formatVND(Math.abs(balance));
+    el.monthlyBalance.classList.toggle("balance-negative", balance < 0);
+    el.monthlyBalance.classList.toggle("balance-positive", balance >= 0);
+
     updateBonsaiStatus();
+  }
+
+  async function fetchMonthlySummary() {
+    try {
+      const res = await fetch(`${API_BASE}/api/summary/monthly?user_id=${USER_ID}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      state.monthlyIncome = data.total_income;
+      state.monthlyExpense = data.total_expense;
+      updateDashboard();
+    } catch (err) {
+      console.warn("Failed to load monthly summary:", err);
+    }
   }
 
   function addActivityItem(txn) {
     el.activityEmpty.style.display = "none";
+    const isIncome = txn.type === "income";
     const item = document.createElement("div");
     item.className = "activity-item";
     item.innerHTML = `
@@ -529,7 +594,7 @@
         <div class="desc">${escapeHtml(txn.description || txn.category)}</div>
         <div class="cat">${escapeHtml(txn.category)}</div>
       </span>
-      <span class="amount">-${formatVND(txn.amount)}</span>
+      <span class="amount ${isIncome ? "amount-income" : "amount-expense"}">${isIncome ? "+" : "-"}${formatVND(txn.amount)}</span>
     `;
     el.activityList.prepend(item);
   }
@@ -545,19 +610,31 @@
     state.pending = items;
     el.confirmRows.innerHTML = "";
     items.forEach((item, index) => {
+      const type = item.type === "income" ? "income" : "expense";
       const row = document.createElement("div");
       row.className = "confirm-row";
       row.dataset.index = index;
       row.innerHTML = `
-        <input type="number" class="amount-input" value="${item.amount}" min="1" step="1000" />
-        <input type="text" class="desc-input desc-cell" value="${escapeHtml(item.description || "")}" placeholder="Mô tả" />
-        <button class="remove-btn" title="Xóa">✕</button>
-        <select class="cat-input cat-cell">
+        <div class="confirm-row-top">
+          <input type="number" class="amount-input" value="${item.amount}" min="1" step="1000" />
+          <button type="button" class="type-badge type-${type}" data-type="${type}">${type === "income" ? "Thu" : "Chi"}</button>
+          <button class="remove-btn" title="Xóa">✕</button>
+        </div>
+        <input type="text" class="desc-input" value="${escapeHtml(item.description || "")}" placeholder="Mô tả" />
+        <select class="cat-input">
           ${CATEGORIES.map(
             (c) => `<option value="${c.value}" ${c.value === item.category ? "selected" : ""}>${c.icon} ${c.value}</option>`
           ).join("")}
         </select>
       `;
+      row.querySelector(".type-badge").addEventListener("click", (e) => {
+        const btn = e.currentTarget;
+        const next = btn.dataset.type === "income" ? "expense" : "income";
+        btn.dataset.type = next;
+        btn.textContent = next === "income" ? "Thu" : "Chi";
+        btn.classList.toggle("type-income", next === "income");
+        btn.classList.toggle("type-expense", next === "expense");
+      });
       row.querySelector(".remove-btn").addEventListener("click", () => {
         row.remove();
         if (el.confirmRows.children.length === 0) hideConfirmation();
@@ -575,7 +652,7 @@
 
   function collectConfirmedTransactions() {
     return Array.from(el.confirmRows.querySelectorAll(".confirm-row")).map((row) => ({
-      type: "expense",
+      type: row.querySelector(".type-badge").dataset.type,
       amount: parseInt(row.querySelector(".amount-input").value, 10),
       category: row.querySelector(".cat-input").value,
       description: row.querySelector(".desc-input").value,
@@ -635,8 +712,12 @@
 
       state.streak = data.current_streak;
       transactions.forEach((txn) => {
-        state.todayTotal += txn.amount;
-        state.todayCount += 1;
+        if (txn.type === "income") {
+          state.monthlyIncome += txn.amount;
+        } else {
+          state.monthlyExpense += txn.amount;
+          state.todayExpense += txn.amount;
+        }
         addActivityItem(txn);
       });
       updateDashboard();
@@ -679,4 +760,5 @@
   });
 
   updateDashboard();
+  fetchMonthlySummary();
 </script>

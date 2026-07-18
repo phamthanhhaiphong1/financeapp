@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
-from sqlalchemy import func
+from sqlalchemy import extract, func
 
 from backend.core.gemini_service import parse_expense
 from backend.models.database import (
@@ -23,6 +23,7 @@ class ParseRequest(BaseModel):
 
 
 class ParsedTransaction(BaseModel):
+    type: TransactionType = TransactionType.EXPENSE
     amount: int
     currency: str = "VND"
     category: str
@@ -57,6 +58,12 @@ class SaveTransactionsResponse(BaseModel):
     saved: int
     transaction_ids: List[int]
     current_streak: int
+
+
+class MonthlySummaryResponse(BaseModel):
+    total_income: int
+    total_expense: int
+    balance: int
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -125,6 +132,36 @@ def create_transactions(payload: SaveTransactionsRequest):
             saved=len(created),
             transaction_ids=[txn.id for txn in created],
             current_streak=user.current_streak,
+        )
+    finally:
+        db.close()
+
+
+@router.get("/summary/monthly", response_model=MonthlySummaryResponse)
+def get_monthly_summary(user_id: int):
+    db = SessionLocal()
+    try:
+        today = date.today()
+
+        def sum_for(txn_type: TransactionType) -> int:
+            return (
+                db.query(func.coalesce(func.sum(Transaction.amount), 0))
+                .filter(
+                    Transaction.user_id == user_id,
+                    Transaction.type == txn_type,
+                    extract("year", Transaction.created_at) == today.year,
+                    extract("month", Transaction.created_at) == today.month,
+                )
+                .scalar()
+            )
+
+        total_income = sum_for(TransactionType.INCOME)
+        total_expense = sum_for(TransactionType.EXPENSE)
+
+        return MonthlySummaryResponse(
+            total_income=total_income,
+            total_expense=total_expense,
+            balance=total_income - total_expense,
         )
     finally:
         db.close()
