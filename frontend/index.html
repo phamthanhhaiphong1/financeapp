@@ -383,7 +383,9 @@
 </div>
 
 <script>
-  const API_BASE = "http://localhost:8000";
+  const API_BASE = ["localhost", "127.0.0.1", ""].includes(window.location.hostname)
+    ? "http://localhost:8000"
+    : "";
   const USER_ID = 1;
   // Placeholder until a GET /api/users/{id} endpoint exposes the real monthly_budget.
   const DAILY_SOFT_LIMIT = 300000;
