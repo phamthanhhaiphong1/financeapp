@@ -12,6 +12,8 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    inspect,
+    text,
 )
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
@@ -66,6 +68,9 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String, unique=True, nullable=False)
+    name = Column(String(120))
+    pin_salt = Column(String(64))
+    pin_hash = Column(String(128))
     monthly_budget = Column(Integer, nullable=False, default=0)
     fire_target = Column(Integer, nullable=False, default=0)
     current_streak = Column(Integer, nullable=False, default=0)
@@ -106,9 +111,25 @@ class GamificationLog(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# The frontend hard-codes USER_ID = 1 (no auth/onboarding flow yet), so make
-# sure that row exists on a fresh database instead of every save 404ing.
-with SessionLocal() as _db:
-    if _db.get(User, 1) is None:
-        _db.add(User(id=1, email="demo@fire-finance.local", monthly_budget=0, fire_target=0))
-        _db.commit()
+
+def _ensure_column(table_name: str, column_name: str, ddl_type: str) -> None:
+    """Adds a column to an already-deployed table if the model gained one.
+
+    create_all() only creates tables that don't exist yet — it never alters
+    an existing table's columns. Without this, every time a new field (like
+    name/pin_salt/pin_hash here) is added to a model, production would need
+    a manual DB reset to pick it up.
+    """
+    inspector = inspect(engine)
+    if not inspector.has_table(table_name):
+        return
+    existing_columns = {col["name"] for col in inspector.get_columns(table_name)}
+    if column_name in existing_columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl_type}"))
+
+
+_ensure_column("users", "name", "VARCHAR(120)")
+_ensure_column("users", "pin_salt", "VARCHAR(64)")
+_ensure_column("users", "pin_hash", "VARCHAR(128)")

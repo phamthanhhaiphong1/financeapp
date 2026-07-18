@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.transactions import router as transactions_router
+from backend.api.users import router as users_router
 
 app = FastAPI(title="FIRE Finance Cockpit API")
 
@@ -15,3 +16,4 @@ app.add_middleware(
 )
 
 app.include_router(transactions_router)
+app.include_router(users_router)
