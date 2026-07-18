@@ -20,6 +20,25 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 with open(PROMPT_PATH, "r", encoding="utf-8") as f:
     SYSTEM_INSTRUCTIONS = f.read()
 
+# response_mime_type alone only nudges the model toward JSON-looking text; it
+# doesn't guarantee syntactically valid JSON (we saw missing commas between
+# array items in practice). response_schema turns on constrained decoding so
+# the output is grammatically forced to match this structure.
+TRANSACTION_RESPONSE_SCHEMA = types.Schema(
+    type=types.Type.ARRAY,
+    items=types.Schema(
+        type=types.Type.OBJECT,
+        required=["type", "amount", "category", "description"],
+        properties={
+            "type": types.Schema(type=types.Type.STRING, enum=["expense", "income"]),
+            "amount": types.Schema(type=types.Type.INTEGER),
+            "currency": types.Schema(type=types.Type.STRING),
+            "category": types.Schema(type=types.Type.STRING),
+            "description": types.Schema(type=types.Type.STRING),
+        },
+    ),
+)
+
 
 def _get_client():
     if not GEMINI_API_KEY:
@@ -50,6 +69,7 @@ def parse_expense(input_data, is_image=False, mime_type="image/jpeg"):
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTIONS,
             response_mime_type="application/json",
+            response_schema=TRANSACTION_RESPONSE_SCHEMA,
         ),
     )
     return _extract_json(response.text)
