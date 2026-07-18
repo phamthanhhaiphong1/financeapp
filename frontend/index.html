@@ -583,6 +583,24 @@
     }
   }
 
+  async function fetchTodayTransactions() {
+    try {
+      const res = await fetch(`${API_BASE}/api/transactions/today?user_id=${USER_ID}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = (data.transactions || []).slice().reverse();
+      items.forEach((txn) => {
+        addActivityItem(txn);
+        if (txn.type !== "income") {
+          state.todayExpense += txn.amount;
+        }
+      });
+      updateBonsaiStatus();
+    } catch (err) {
+      console.warn("Failed to load today's transactions:", err);
+    }
+  }
+
   function addActivityItem(txn) {
     el.activityEmpty.style.display = "none";
     const isIncome = txn.type === "income";
@@ -761,4 +779,5 @@
 
   updateDashboard();
   fetchMonthlySummary();
+  fetchTodayTransactions();
 </script>

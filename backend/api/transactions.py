@@ -66,6 +66,18 @@ class MonthlySummaryResponse(BaseModel):
     balance: int
 
 
+class TodayTransactionItem(BaseModel):
+    id: int
+    type: TransactionType
+    amount: int
+    category: str
+    description: Optional[str] = None
+
+
+class TodayTransactionsResponse(BaseModel):
+    transactions: List[TodayTransactionItem]
+
+
 @router.post("/parse", response_model=ParseResponse)
 def parse_transactions(payload: ParseRequest):
     if payload.image_base64:
@@ -165,6 +177,33 @@ def get_monthly_summary(user_id: int):
             total_income=total_income,
             total_expense=total_expense,
             balance=total_income - total_expense,
+        )
+    finally:
+        db.close()
+
+
+@router.get("/transactions/today", response_model=TodayTransactionsResponse)
+def get_today_transactions(user_id: int):
+    db = SessionLocal()
+    try:
+        today = date.today()
+        rows = (
+            db.query(Transaction)
+            .filter(Transaction.user_id == user_id, func.date(Transaction.created_at) == today)
+            .order_by(Transaction.created_at.desc())
+            .all()
+        )
+        return TodayTransactionsResponse(
+            transactions=[
+                TodayTransactionItem(
+                    id=t.id,
+                    type=t.type,
+                    amount=t.amount,
+                    category=t.category,
+                    description=t.description,
+                )
+                for t in rows
+            ]
         )
     finally:
         db.close()
