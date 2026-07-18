@@ -69,15 +69,18 @@ class MonthlySummaryResponse(BaseModel):
 @router.post("/parse", response_model=ParseResponse)
 def parse_transactions(payload: ParseRequest):
     if payload.image_base64:
-        raw = parse_expense(payload.image_base64, is_image=True)
+        parse_args = (payload.image_base64,)
+        parse_kwargs = {"is_image": True}
     elif payload.text:
-        raw = parse_expense(payload.text, is_image=False)
+        parse_args = (payload.text,)
+        parse_kwargs = {"is_image": False}
     else:
         raise HTTPException(status_code=400, detail="Provide either 'text' or 'image_base64'")
 
     try:
+        raw = parse_expense(*parse_args, **parse_kwargs)
         parsed = [ParsedTransaction(**item) for item in raw]
-    except (TypeError, ValueError) as exc:
+    except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to parse AI response: {exc}")
 
     return ParseResponse(transactions=parsed)

@@ -22,7 +22,7 @@ You are a highly precise Personal Finance Assistant processing Text and Images (
 Respond ONLY with a valid JSON array. No markdown blocks, no conversational text.
 [
   {
-    "type": "expense" | "income",
+    "type": "<string: exactly 'expense' or 'income'>",
     "amount": <number>,
     "currency": "VND",
     "category": "<string from ALLOWED CATEGORIES>",
