@@ -446,7 +446,7 @@
       <span class="value">🔥 <span id="streak-value">0</span> ngày</span>
     </div>
     <div class="stat-tile bonsai-tile status-good" id="bonsai-tile">
-      <span class="label">Bonsai</span>
+      <span class="label">Financial Health</span>
       <span class="value"><span id="bonsai-emoji">🌳</span> <span id="bonsai-label">Khỏe mạnh</span></span>
     </div>
   </header>
@@ -518,8 +518,8 @@
   const USER_NAME_KEY = "ffcUserName";
   let USER_ID = localStorage.getItem(USER_ID_KEY) ? parseInt(localStorage.getItem(USER_ID_KEY), 10) : null;
   let USER_NAME = localStorage.getItem(USER_NAME_KEY) || "";
-  // Placeholder until a GET /api/users/{id} endpoint exposes the real monthly_budget.
-  const DAILY_SOFT_LIMIT = 300000;
+  // Financial Health warns once this month's spending reaches this share of income.
+  const HEALTH_WARNING_RATIO = 0.8;
 
   const CATEGORIES = [
     { value: "Ăn uống", icon: "🍜" },
@@ -535,7 +535,6 @@
 
   const state = {
     streak: 0,
-    todayExpense: 0,
     monthlyIncome: 0,
     monthlyExpense: 0,
     pending: [],
@@ -646,7 +645,13 @@
   }
 
   function updateBonsaiStatus() {
-    const isWarning = state.todayExpense >= DAILY_SOFT_LIMIT;
+    const spendRatio =
+      state.monthlyIncome > 0
+        ? state.monthlyExpense / state.monthlyIncome
+        : state.monthlyExpense > 0
+        ? Infinity
+        : 0;
+    const isWarning = spendRatio >= HEALTH_WARNING_RATIO;
     el.bonsaiTile.classList.toggle("status-good", !isWarning);
     el.bonsaiTile.classList.toggle("status-warning", isWarning);
     el.bonsaiEmoji.textContent = isWarning ? "🍂" : "🌳";
@@ -685,13 +690,7 @@
       if (!res.ok) return;
       const data = await res.json();
       const items = (data.transactions || []).slice().reverse();
-      items.forEach((txn) => {
-        addActivityItem(txn);
-        if (txn.type !== "income") {
-          state.todayExpense += txn.amount;
-        }
-      });
-      updateBonsaiStatus();
+      items.forEach((txn) => addActivityItem(txn));
     } catch (err) {
       console.warn("Failed to load today's transactions:", err);
     }
@@ -830,7 +829,6 @@
           state.monthlyIncome += txn.amount;
         } else {
           state.monthlyExpense += txn.amount;
-          state.todayExpense += txn.amount;
         }
         addActivityItem(txn);
       });
